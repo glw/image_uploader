@@ -1,0 +1,13 @@
+postgresql:
+    HOST: 'localhost'
+    USER: 'user'
+    PASSWD: 'user'
+    DATABASE: 'database'
+
+spaces:
+    REGION_NAME: 'nyc3'
+    ENDPOINT_URL: 'https://nyc3.digitaloceanspaces.com',
+    AWS_ACCESS_KEY_ID: 'ACCESS_KEY',
+    AWS_SECRET_ACCESS_KEY: 'SECRET_KEY'
+    BUCKETNAME: 'your bucket name'
+    SPACESPATH: 'path for publicly available link to bucket'
