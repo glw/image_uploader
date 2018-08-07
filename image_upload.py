@@ -27,6 +27,7 @@ ACCESS_KEY_ID = config['spaces']['ACCESS_KEY_ID']
 SECRET_ACCESS_KEY = config['spaces']['SECRET_ACCESS_KEY']
 BUCKETNAME = config['spaces']['BUCKETNAME']
 SPACESPATH = config['spaces']['SPACESPATH']
+SPACESDIR = config['spaces']['SPACESDIR']
 
 ###############
 ## Parse inputs
@@ -171,6 +172,7 @@ with open(os.path.join(file_path,output_jpg), 'rb') as f:
     finally:
         f.close()
 
+
     try:
         ######################################
         print('Upload file to Digital Ocean Spaces')
@@ -186,17 +188,19 @@ with open(os.path.join(file_path,output_jpg), 'rb') as f:
                                 aws_access_key_id=ACCESS_KEY_ID,
                                 aws_secret_access_key=SECRET_ACCESS_KEY)
 
+        key_text = os.path.join(SPACESDIR, output_jpg)
+
         # upload file
         client.upload_file(os.path.join(file_path,output_jpg),  # Path to local file
                             BUCKETNAME,  # Name of Space
-                            output_jpg)  # Name for remote file
+                            os.path.join('objects', output_jpg))  # Name for remote file
         # make file public after upload
-        client.put_object_acl( ACL='public-read', Bucket=BUCKETNAME, Key=KEYNAME )
+        client.put_object_acl( ACL='public-read', Bucket=BUCKETNAME, Key=key_text)
 
         print('##################')
         print('{} uploading complete. ').format(output_jpg)
         print('#################')
 
     except Exception as e:
-        print('Error: Could not uploade file.')
+        print('Error: Could not upload file.')
         print(e)

@@ -11,3 +11,4 @@ spaces:
     SECRET_ACCESS_KEY: 'SECRET_KEY'
     BUCKETNAME: 'your bucket name'
     SPACESPATH: 'path for publicly available link to bucket'
+    SPACESDIR: 'Folder/Directory you want to keep the file in'
