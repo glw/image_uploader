@@ -2,6 +2,16 @@
 # Basic usage:
 # python image_upload.py -i ../signs_to_be_uploaded/image.jpg
 
+# TO DO:
+## 1. resize and minimize files. Probably requires copy exif data from one file to another
+## 2. tensorflow image classification for automated sign types.
+## 3. add geom in SQL statement
+## 4. make Try/Except smoother, so that if one step fails neither steps execute.
+## 5. key board interrupt
+## 6. If insert fails, change image name back to origin name.
+## 7. use logging instead of print statements for debugging.
+
+
 import yaml
 import boto3
 import uuid
@@ -10,6 +20,7 @@ import os
 import exifread
 import psycopg2
 import psycopg2.extras
+from datetime import date
 
 #############
 ## Env setup
@@ -52,11 +63,6 @@ print('Processing File: {} ').format(input_filename)
 print('##################')
 print('Renaming: {} to {} ').format(file_basename, output_jpg)
 print('##################')
-
-
-## TO DO:
-## 1. resize and minimize files
-## 2. tensorflow image classification for automated sign types.
 
 
 # source: https://github.com/ianare/exif-py/issues/66
@@ -148,7 +154,7 @@ with open(os.path.join(file_path,output_jpg), 'rb') as f:
         coordinates = get_coordinates(tags)
         latitude = str(coordinates[1])
         longitude = str(coordinates[0])
-
+        current_image_date = date.today().isoformat()
 
         ##############################
         ## Upload metadata to postgis
@@ -156,18 +162,21 @@ with open(os.path.join(file_path,output_jpg), 'rb') as f:
         path = SPACESPATH
         full_path = path + output_jpg
 
-        sql = 'insert into public.signage (name, path, full_path, latitude, longitude) values(%s, %s, %s, %s, %s);'
+        sql = 'insert into public.signage (name, path, full_path, latitude, longitude, current_image_date) values(%s, %s, %s, %s, %s, %s);'
 
-        data = (output_jpg, path, full_path, latitude, longitude)
+        data = (output_jpg, path, full_path, latitude, longitude, current_image_date)
 
         #print(sql)
         #print(data)
+
+        DB.insert_data(sql, data)
+
         print('Creating point at: Latitude: {}, Longitude: {} ').format(latitude, longitude)
         print('###################')
 
-        DB.insert_data(sql, data)
-    except:
-        Print('could not insert data')
+    except Exception as e:
+        print('Error: Could not insert data.')
+        print(e)
 
     finally:
         f.close()
