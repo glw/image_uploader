@@ -52,11 +52,14 @@ args = vars(ap.parse_args())
 #######################
 input_filename = args["input"]
 file_path, file_basename = os.path.split(input_filename)
+
 # rename file
 # new_name = uuid.uuid4().hex
 output_jpg = uuid.uuid4().hex + '.jpg'
 # output_jpg = file_basename
-os.rename(os.path.join(file_path,file_basename), os.path.join(file_path,output_jpg))
+
+# Renaming shouldnt be done locally it can simply be done when uploading to Spaces below
+# os.rename(os.path.join(file_path,file_basename), os.path.join(file_path,output_jpg))
 
 print('##################')
 print('Processing File: {} ').format(input_filename)
@@ -145,7 +148,7 @@ class DB():
         self._close()
 DB = DB()
 
-with open(os.path.join(file_path,output_jpg), 'rb') as f:
+with open(input_filename, 'rb') as f:
     try:
         ###############
         ## Get metadata
@@ -174,42 +177,41 @@ with open(os.path.join(file_path,output_jpg), 'rb') as f:
         print('Creating point at: Latitude: {}, Longitude: {} ').format(latitude, longitude)
         print('###################')
 
+        try:
+            ######################################
+            print('Upload file to Digital Ocean Spaces')
+            ######################################
+            # s3cmd put file.jpg --acl-public s3://spacename/path/
+            # s3cmd setacl s3://spacename/file.jpg --acl-public
+
+            # https://medium.com/@tatianatylosky/uploading-files-with-python-using-digital-ocean-spaces-58c9a57eb05b
+            session = boto3.session.Session()
+            client = session.client('s3',
+                                    region_name=REGION_NAME,
+                                    endpoint_url=ENDPOINT_URL,
+                                    aws_access_key_id=ACCESS_KEY_ID,
+                                    aws_secret_access_key=SECRET_ACCESS_KEY)
+
+            key_text = os.path.join(SPACESDIR, output_jpg)
+
+            # upload file
+            client.upload_file(input_filename,  # Path to local file
+                                BUCKETNAME,  # Name of Space
+                                os.path.join('objects', output_jpg))  # Name for remote file
+            # make file public after upload
+            client.put_object_acl( ACL='public-read', Bucket=BUCKETNAME, Key=key_text)
+
+            print('##################')
+            print('{} uploading complete. ').format(output_jpg)
+            print('#################')
+
+        except Exception as e:
+            print('Error: Could not upload file.')
+            print(e)
+
     except Exception as e:
         print('Error: Could not insert data.')
         print(e)
 
     finally:
         f.close()
-
-
-    try:
-        ######################################
-        print('Upload file to Digital Ocean Spaces')
-        ######################################
-        # s3cmd put file.jpg --acl-public s3://spacename/path/
-        # s3cmd setacl s3://spacename/file.jpg --acl-public
-
-        # https://medium.com/@tatianatylosky/uploading-files-with-python-using-digital-ocean-spaces-58c9a57eb05b
-        session = boto3.session.Session()
-        client = session.client('s3',
-                                region_name=REGION_NAME,
-                                endpoint_url=ENDPOINT_URL,
-                                aws_access_key_id=ACCESS_KEY_ID,
-                                aws_secret_access_key=SECRET_ACCESS_KEY)
-
-        key_text = os.path.join(SPACESDIR, output_jpg)
-
-        # upload file
-        client.upload_file(os.path.join(file_path,output_jpg),  # Path to local file
-                            BUCKETNAME,  # Name of Space
-                            os.path.join('objects', output_jpg))  # Name for remote file
-        # make file public after upload
-        client.put_object_acl( ACL='public-read', Bucket=BUCKETNAME, Key=key_text)
-
-        print('##################')
-        print('{} uploading complete. ').format(output_jpg)
-        print('#################')
-
-    except Exception as e:
-        print('Error: Could not upload file.')
-        print(e)
