@@ -8,7 +8,7 @@
 ## 3. add geom in SQL statement
 ## 4. make Try/Except smoother, so that if one step fails neither steps execute.
 ## 5. key board interrupt
-## 6. If insert fails, change image name back to origin name.
+## DONE 6. If insert fails, change image name back to origin name.
 ## 7. use logging instead of print statements for debugging.
 
 
@@ -62,9 +62,9 @@ output_jpg = uuid.uuid4().hex + '.jpg'
 # os.rename(os.path.join(file_path,file_basename), os.path.join(file_path,output_jpg))
 
 print('##################')
-print('Processing File: {} ').format(input_filename)
+print('Processing File: %s ' % (input_filename))
 print('##################')
-print('Renaming: {} to {} ').format(file_basename, output_jpg)
+print('Renaming: %s to %s ' % (file_basename, output_jpg))
 print('##################')
 
 
@@ -80,7 +80,7 @@ def get_coordinates(tags):
     gps_tags = [lng_ref_tag_name,lng_tag_name,lat_tag_name,lat_tag_name]
     for tag in gps_tags:
         if not tag in tags.keys():
-            print ("Skipping file. Tag {} not present.".format(tag))
+            print ("Skipping file. Tag %s not present." % (tag))
             return None
 
     convert = lambda ratio: float(ratio.num)/float(ratio.den)
@@ -146,6 +146,18 @@ class DB():
         cur.execute(sql, data)
         self.conn.commit()
         self._close()
+
+    def delete_data(self, sql_remove, data_remove):
+        """
+         :param sql: text string with the sql statement
+         :return:
+        """
+        self._connect()
+        cur = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        cur.execute(sql_remove, data_remove)
+        self.conn.commit()
+        self._close()
+
 DB = DB()
 
 with open(input_filename, 'rb') as f:
@@ -174,7 +186,7 @@ with open(input_filename, 'rb') as f:
 
         DB.insert_data(sql, data)
 
-        print('Creating point at: Latitude: {}, Longitude: {} ').format(latitude, longitude)
+        print('Creating point at: Latitude: %s, Longitude: %s ' % (latitude, longitude))
         print('###################')
 
         try:
@@ -202,11 +214,21 @@ with open(input_filename, 'rb') as f:
             client.put_object_acl( ACL='public-read', Bucket=BUCKETNAME, Key=key_text)
 
             print('##################')
-            print('{} uploading complete. ').format(output_jpg)
+            print('%s uploading complete. ' % (output_jpg))
             print('#################')
 
         except Exception as e:
-            print('Error: Could not upload file.')
+            print('Error: Could not upload file...')
+            print('Removing point from table..')
+           
+            sql_remove = 'delete from public.signage where name = %s;'
+            data_remove = output_jpg
+
+            DB.delete_data(sql_remove, data_remove)
+
+            print('#################')
+            print(sql_remove, data_remove)
+            print('#################')
             print(e)
 
     except Exception as e:
