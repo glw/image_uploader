@@ -11,12 +11,11 @@
 ## DONE 6. If insert fails, change image name back to origin name.
 ## 7. use logging instead of print statements for debugging.
 
-
+import os
 import yaml
 import boto3
 import uuid
 import argparse
-import os
 import exifread
 import psycopg2
 import psycopg2.extras
@@ -55,31 +54,16 @@ args = vars(ap.parse_args())
 #######################
 input_filename = args["input"]
 file_path, file_basename = os.path.split(input_filename)
+print(input_filename)
 
 # docker image for image processing
 def gdal_process(image):
-    gdal_processing = 'gdal_translate -of JPEG -co WRITE_EXIF_METADATA=YES -co PROGRESSIVE=ON -co QUALITY=50 -outsize 50% 50% %s %s' % (input_filename, input_filename)
+    file_path
+    gdal_in = '/data/' + file_basename
+    gdal_out = '/data/' + file_basename
+    gdal_processing = 'gdal_translate -of JPEG -co WRITE_EXIF_METADATA=YES -co PROGRESSIVE=ON -co QUALITY=50 -outsize 50% 50% %s %s' % (gdal_out, gdal_in)
 
-    volumes = ['/data']
-    volume_bindings = {
-                        $(pwd): {
-                            'bind': '/data',
-                            'mode': 'rw',
-                        },
-                    }
-    host_config = client.create_host_config(
-        binds=volume_bindings
-    )
-    container = client.create_container(
-        image = 'alpine_gdal2.3.1:1.0',
-        volumes = volumes,
-        host_config = host_config,
-        tty = True,
-        stdin_open = True,
-        command = gdal_processing,
-    )
-
-    dockerpty.start(client, container)
+    client.containers.run("garretw/alpine_gdal2.3.1:1.0", gdal_processing, detach=True, stdin_open=True, volumes=[file_path+':/data:rw'])
 
 # client.images.pull('garretw/alpine_gdal2.3.1:1.0')
 # client.containers.run('alpine_gdal2.3.1:1.0', detach=True, command=gdal_processing)
