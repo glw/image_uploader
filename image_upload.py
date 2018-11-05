@@ -58,7 +58,7 @@ print(input_filename)
 
 # docker image for image processing
 def gdal_process(image):
-    file_path
+    # have docker check for image, if not there pull image
     gdal_in = '/data/' + file_basename
     gdal_out = '/data/' + file_basename
     gdal_processing = 'gdal_translate -of JPEG -co WRITE_EXIF_METADATA=YES -co PROGRESSIVE=ON -co QUALITY=50 -outsize 50% 50% %s %s' % (gdal_out, gdal_in)
