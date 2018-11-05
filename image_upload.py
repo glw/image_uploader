@@ -6,7 +6,7 @@
 ## 1. resize and minimize files. Probably requires copy exif data from one file to another
 ## 2. tensorflow image classification for automated sign types.
 ## 3. add geom in SQL statement
-## 4. make Try/Except smoother, so that if one step fails neither steps execute.
+## DONE 4. make Try/Except smoother, so that if one step fails neither steps execute.
 ## 5. key board interrupt
 ## DONE 6. If insert fails, change image name back to origin name.
 ## 7. use logging instead of print statements for debugging.
@@ -21,6 +21,9 @@ import exifread
 import psycopg2
 import psycopg2.extras
 from datetime import date
+import docker
+import dockerpty
+client = docker.from_env()
 
 #############
 ## Env setup
@@ -52,6 +55,35 @@ args = vars(ap.parse_args())
 #######################
 input_filename = args["input"]
 file_path, file_basename = os.path.split(input_filename)
+
+# docker image for image processing
+def gdal_process(image):
+    gdal_processing = 'gdal_translate -of JPEG -co WRITE_EXIF_METADATA=YES -co PROGRESSIVE=ON -co QUALITY=50 -outsize 50% 50% %s %s' % (input_filename, input_filename)
+
+    volumes = ['/data']
+    volume_bindings = {
+                        $(pwd): {
+                            'bind': '/data',
+                            'mode': 'rw',
+                        },
+                    }
+    host_config = client.create_host_config(
+        binds=volume_bindings
+    )
+    container = client.create_container(
+        image = 'alpine_gdal2.3.1:1.0',
+        volumes = volumes,
+        host_config = host_config,
+        tty = True,
+        stdin_open = True,
+        command = gdal_processing,
+    )
+
+    dockerpty.start(client, container)
+
+# client.images.pull('garretw/alpine_gdal2.3.1:1.0')
+# client.containers.run('alpine_gdal2.3.1:1.0', detach=True, command=gdal_processing)
+
 
 # rename file
 # new_name = uuid.uuid4().hex
@@ -153,7 +185,7 @@ class DB():
          :return:
         """
         self._connect()
-        cur = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        cur = self.conn.cursor()
         cur.execute(sql_remove, data_remove)
         self.conn.commit()
         self._close()
@@ -162,6 +194,13 @@ DB = DB()
 
 with open(input_filename, 'rb') as f:
     try:
+        #####################################
+        ## GDAL shrink image keeping exif tags
+        #####################################
+        print('GDAL processing image...')
+        gdal_process(input_filename)
+        print('done')
+
         ###############
         ## Get metadata
         ###############
@@ -177,7 +216,7 @@ with open(input_filename, 'rb') as f:
         path = SPACESPATH
         full_path = path + output_jpg
 
-        sql = 'insert into public.signage (name, path, full_path, latitude, longitude, current_image_date) values(%s, %s, %s, %s, %s, %s);'
+        sql = 'INSERT into public.signage (name, path, full_path, latitude, longitude, current_image_date) values(%s, %s, %s, %s, %s, %s);'
 
         data = (output_jpg, path, full_path, latitude, longitude, current_image_date)
 
@@ -219,17 +258,16 @@ with open(input_filename, 'rb') as f:
 
         except Exception as e:
             print('Error: Could not upload file...')
-            print('Removing point from table..')
-           
-            sql_remove = 'delete from public.signage where name = %s;'
-            data_remove = output_jpg
-
-            DB.delete_data(sql_remove, data_remove)
-
             print('#################')
-            print(sql_remove, data_remove)
+            # If upload to Spaces did not complete then remove point from database
+            print('Removing point from table..')
+            sql_remove = 'DELETE from public.signage WHERE name = %s;'
+            data_remove = [output_jpg]
+            DB.delete_data(sql_remove, data_remove)
+            print('DELETE from public.signage WHERE name = %s' % (output_jpg))
             print('#################')
             print(e)
+            raise
 
     except Exception as e:
         print('Error: Could not insert data.')
