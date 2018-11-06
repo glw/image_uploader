@@ -58,16 +58,15 @@ print(input_filename)
 
 # docker image for image processing
 def gdal_process(image):
+    if "garretw/alpine_gdal2.3.1:1.0" not in client.images.list():
+        client.images.pull('garretw/alpine_gdal2.3.1:1.0')
+
     # have docker check for image, if not there pull image
     gdal_in = '/data/' + file_basename
     gdal_out = '/data/' + file_basename
-    gdal_processing = 'gdal_translate -of JPEG -co WRITE_EXIF_METADATA=YES -co PROGRESSIVE=ON -co QUALITY=50 -outsize 50% 50% %s %s' % (gdal_out, gdal_in)
-
-    client.containers.run("garretw/alpine_gdal2.3.1:1.0", gdal_processing, detach=True, stdin_open=True, volumes=[file_path+':/data:rw'])
-
-# client.images.pull('garretw/alpine_gdal2.3.1:1.0')
-# client.containers.run('alpine_gdal2.3.1:1.0', detach=True, command=gdal_processing)
-
+    test_command = "ls"
+    gdal_processing = "gdal_translate -of JPEG -co WRITE_EXIF_METADATA=YES -co PROGRESSIVE=ON -co QUALITY=25 -outsize 50 50 %s %s" % (gdal_in, gdal_out)
+    client.containers.run('garretw/alpine_gdal2.3.1:1.0', name=temp_name, command='ls', detach=True, stdin_open=True, volumes={'/data': {'bind': file_path, 'mode': 'rw'}})
 
 # rename file
 # new_name = uuid.uuid4().hex
@@ -181,7 +180,7 @@ with open(input_filename, 'rb') as f:
         #####################################
         ## GDAL shrink image keeping exif tags
         #####################################
-        print('GDAL processing image...')
+        print('GDAL shrinking image...')
         gdal_process(input_filename)
         print('done')
 
