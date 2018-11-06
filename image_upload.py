@@ -64,9 +64,8 @@ def gdal_process(image):
     # have docker check for image, if not there pull image
     gdal_in = '/data/' + file_basename
     gdal_out = '/data/' + file_basename
-    test_command = "ls"
     gdal_processing = "gdal_translate -of JPEG -co WRITE_EXIF_METADATA=YES -co PROGRESSIVE=ON -co QUALITY=25 -outsize 50 50 %s %s" % (gdal_in, gdal_out)
-    client.containers.run('garretw/alpine_gdal2.3.1:1.0', name=temp_name, command='ls', detach=True, stdin_open=True, volumes={'/data': {'bind': file_path, 'mode': 'rw'}})
+    client.containers.run('garretw/alpine_gdal2.3.1:1.0', name=temp_name, command=gdal_processing, detach=True, stdin_open=True, volumes={'/data': {'bind': file_path, 'mode': 'rw'}})
 
 # rename file
 # new_name = uuid.uuid4().hex
