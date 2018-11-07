@@ -10,6 +10,8 @@
 ## 5. key board interrupt
 ## DONE 6. If insert fails, change image name back to origin name.
 ## 7. use logging instead of print statements for debugging.
+## 8. improve script so it process all images in a directory
+
 
 import os
 import yaml
