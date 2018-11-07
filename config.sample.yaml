@@ -3,6 +3,8 @@ postgresql:
     USER: 'user'
     PASSWD: 'user'
     DATABASE: 'database'
+    SCHEMA: 'schema'
+    TABLE: 'table'
 
 spaces:
     REGION_NAME: 'nyc3'

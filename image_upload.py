@@ -32,6 +32,8 @@ HOST = config['postgresql']['HOST']
 USER = config['postgresql']['USER']
 PASSWD = config['postgresql']['PASSWD']
 DATABASE = config['postgresql']['DATABASE']
+SCHEMA = config['postgresql']['SCHEMA']
+TABLE = config['postgresql']['TABLE']
 # D.O. spaces
 REGION_NAME = config['spaces']['REGION_NAME']
 ENDPOINT_URL = config['spaces']['ENDPOINT_URL']
@@ -189,10 +191,10 @@ with open(input_filename, 'rb') as f:
         path = SPACESPATH
         full_path = path + output_jpg
 
-        sql = 'INSERT into public.signage (name, path, full_path, latitude, longitude, current_image_date) values(%s, %s, %s, %s, %s, %s);'
+        sql = 'INSERT into ' + SCHEMA + '.' + TABLE + ' (name, path, full_path, latitude, longitude, current_image_date) values(%s, %s, %s, %s, %s, %s);'
 
         data = (output_jpg, path, full_path, latitude, longitude, current_image_date)
-
+        print(sql)
         DB.insert_data(sql, data)
 
         print('Creating point at: Latitude: %s, Longitude: %s ' % (latitude, longitude))
@@ -229,10 +231,10 @@ with open(input_filename, 'rb') as f:
             print('#################')
             # If upload to Spaces did not complete then remove point from database
             print('Removing point from table..')
-            sql_remove = 'DELETE from public.signage WHERE name = %s;'
+            sql_remove = 'DELETE from ' + SCHEMA + '.' + TABLE + ' WHERE name = %s;'
             data_remove = [output_jpg]
             DB.delete_data(sql_remove, data_remove)
-            print('DELETE from public.signage WHERE name = %s' % (output_jpg))
+            print(sql_remove % (output_jpg))
             print('#################')
             print(e)
             raise
