@@ -28,6 +28,7 @@ import piexif
 #############
 ## Env setup
 #############
+
 config = yaml.safe_load(open("config.yaml"))
 # postgresql db
 HOST = config['postgresql']['HOST']
@@ -196,7 +197,6 @@ with open(input_filename, 'rb') as f:
         sql = 'INSERT into ' + SCHEMA + '.' + TABLE + ' (name, path, full_path, latitude, longitude, current_image_date) values(%s, %s, %s, %s, %s, %s);'
 
         data = (output_jpg, path, full_path, latitude, longitude, current_image_date)
-        print(sql)
         DB.insert_data(sql, data)
 
         print('Creating point at: Latitude: %s, Longitude: %s ' % (latitude, longitude))
