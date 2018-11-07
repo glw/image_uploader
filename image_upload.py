@@ -3,7 +3,7 @@
 # python image_upload.py -i ../signs_to_be_uploaded/image.jpg
 
 # TO DO:
-## 1. resize and minimize files. Probably requires copy exif data from one file to another
+## DONE 1. resize and minimize files. Probably requires copy exif data from one file to another
 ## 2. tensorflow image classification for automated sign types.
 ## 3. add geom in SQL statement
 ## DONE 4. make Try/Except smoother, so that if one step fails neither steps execute.
@@ -20,9 +20,8 @@ import exifread
 import psycopg2
 import psycopg2.extras
 from datetime import date
-import docker
-import dockerpty
-client = docker.from_env()
+from PIL import Image
+import piexif
 
 #############
 ## Env setup
@@ -56,24 +55,8 @@ input_filename = args["input"]
 file_path, file_basename = os.path.split(input_filename)
 print(input_filename)
 
-# docker image for image processing
-def gdal_process(image):
-    if "garretw/alpine_gdal2.3.1:1.0" not in client.images.list():
-        client.images.pull('garretw/alpine_gdal2.3.1:1.0')
-
-    # have docker check for image, if not there pull image
-    gdal_in = '/data/' + file_basename
-    gdal_out = '/data/' + file_basename
-    gdal_processing = "gdal_translate -of JPEG -co WRITE_EXIF_METADATA=YES -co PROGRESSIVE=ON -co QUALITY=25 -outsize 50 50 %s %s" % (gdal_in, gdal_out)
-    client.containers.run('garretw/alpine_gdal2.3.1:1.0', name=temp_name, command=gdal_processing, detach=True, stdin_open=True, volumes={'/data': {'bind': file_path, 'mode': 'rw'}})
-
-# rename file
-# new_name = uuid.uuid4().hex
+# new_name
 output_jpg = uuid.uuid4().hex + '.jpg'
-# output_jpg = file_basename
-
-# Renaming shouldnt be done locally it can simply be done when uploading to Spaces below
-# os.rename(os.path.join(file_path,file_basename), os.path.join(file_path,output_jpg))
 
 print('##################')
 print('Processing File: %s ' % (input_filename))
@@ -81,6 +64,14 @@ print('##################')
 print('Renaming: %s to %s ' % (file_basename, output_jpg))
 print('##################')
 
+# docker image for image processing
+def resize_image(image):
+    file, ext = os.path.splitext(image)
+    im = Image.open(image)
+    exif_dict = piexif.load(im.info["exif"])
+    exif_bytes = piexif.dump(exif_dict)
+    im.thumbnail((800, 800))
+    im.save(file+'.jpg' , 'jpeg', quality=80, optimize=True, progressive=True, exif=exif_bytes)
 
 # source: https://github.com/ianare/exif-py/issues/66
 def get_coordinates(tags):
@@ -176,21 +167,21 @@ DB = DB()
 
 with open(input_filename, 'rb') as f:
     try:
-        #####################################
-        ## GDAL shrink image keeping exif tags
-        #####################################
-        print('GDAL shrinking image...')
-        gdal_process(input_filename)
-        print('done')
-
         ###############
         ## Get metadata
         ###############
+        print('Get Metadata...')
         tags = exifread.process_file(f)
         coordinates = get_coordinates(tags)
         latitude = str(coordinates[1])
         longitude = str(coordinates[0])
         current_image_date = date.today().isoformat()
+
+        #################################
+        ## Shrink image keeping exif tags
+        #################################
+        print('Shrinking image...')
+        resize_image(input_filename)
 
         ##############################
         ## Upload metadata to postgis
@@ -202,9 +193,6 @@ with open(input_filename, 'rb') as f:
 
         data = (output_jpg, path, full_path, latitude, longitude, current_image_date)
 
-        #print(sql)
-        #print(data)
-
         DB.insert_data(sql, data)
 
         print('Creating point at: Latitude: %s, Longitude: %s ' % (latitude, longitude))
@@ -214,8 +202,6 @@ with open(input_filename, 'rb') as f:
             ######################################
             print('Upload file to Digital Ocean Spaces')
             ######################################
-            # s3cmd put file.jpg --acl-public s3://spacename/path/
-            # s3cmd setacl s3://spacename/file.jpg --acl-public
 
             # https://medium.com/@tatianatylosky/uploading-files-with-python-using-digital-ocean-spaces-58c9a57eb05b
             session = boto3.session.Session()
