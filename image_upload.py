@@ -58,15 +58,19 @@ args = vars(ap.parse_args())
 #######################
 input_filename = args["input"]
 file_path, file_basename = os.path.split(input_filename)
-print(input_filename)
 
 # new_name
 output_jpg = uuid.uuid4().hex + '.jpg'
+path_to_output_jpg = os.path.join(file_path,output_jpg)
+# Rename file locally
+os.rename(input_filename, path_to_output_jpg)
+
+
 
 print('##################')
-print('Processing File: %s ' % (input_filename))
+print('Processing File: %s ' % (file_basename))
 print('##################')
-print('Renaming: %s to %s ' % (file_basename, output_jpg))
+print('Renaming to: %s ' % (output_jpg))
 print('##################')
 
 # docker image for image processing
@@ -170,7 +174,7 @@ class DB():
 
 DB = DB()
 
-with open(input_filename, 'rb') as f:
+with open(path_to_output_jpg, 'rb') as f:
     try:
         ###############
         ## Get metadata
@@ -186,7 +190,7 @@ with open(input_filename, 'rb') as f:
         ## Shrink image keeping exif tags
         #################################
         print('Shrinking image...')
-        resize_image(input_filename)
+        resize_image(path_to_output_jpg)
 
         ##############################
         ## Upload metadata to postgis
@@ -218,7 +222,7 @@ with open(input_filename, 'rb') as f:
             key_text = os.path.join(SPACESDIR, output_jpg)
 
             # upload file
-            client.upload_file(input_filename,  # Path to local file
+            client.upload_file(path_to_output_jpg,  # Path to local file
                                 BUCKETNAME,  # Name of Space
                                 os.path.join('objects', output_jpg))  # Name for remote file
             # make file public after upload
