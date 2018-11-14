@@ -11,7 +11,11 @@
 ## DONE 6. If insert fails, change image name back to origin name.
 ## 7. use logging instead of print statements for debugging.
 ## 8. improve script so it process all images in a directory
+## 9. If any part fails image goes back to original name.
 
+# for now ignore psycopg2 warnings
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
 
 import os
 import yaml
@@ -25,10 +29,8 @@ from datetime import date
 from PIL import Image
 import piexif
 
-#############
-## Env setup
-#############
 
+# Config setup
 config = yaml.safe_load(open("config.yaml"))
 # postgresql db
 HOST = config['postgresql']['HOST']
@@ -46,34 +48,21 @@ BUCKETNAME = config['spaces']['BUCKETNAME']
 SPACESPATH = config['spaces']['SPACESPATH']
 SPACESDIR = config['spaces']['SPACESDIR']
 
-###############
-## Parse inputs
-###############
+
+# Parse inputs
 ap = argparse.ArgumentParser()
 ap.add_argument("-i", "--input", required=True, help="input image name.")
 args = vars(ap.parse_args())
 
-#######################
-## file input variables
-#######################
+# file input variables
 input_filename = args["input"]
 file_path, file_basename = os.path.split(input_filename)
 
-# new_name
+# Create new_name
 output_jpg = uuid.uuid4().hex + '.jpg'
 path_to_output_jpg = os.path.join(file_path,output_jpg)
-# Rename file locally
-os.rename(input_filename, path_to_output_jpg)
 
-
-
-print('##################')
-print('Processing File: %s ' % (file_basename))
-print('##################')
-print('Renaming to: %s ' % (output_jpg))
-print('##################')
-
-# docker image for image processing
+# Image Shrinking
 def resize_image(image):
     file, ext = os.path.splitext(image)
     im = Image.open(image)
@@ -94,7 +83,9 @@ def get_coordinates(tags):
     gps_tags = [lng_ref_tag_name,lng_tag_name,lat_tag_name,lat_tag_name]
     for tag in gps_tags:
         if not tag in tags.keys():
+            print('#################')
             print ("Skipping file. Tag %s not present." % (tag))
+            print('#################')
             return None
 
     convert = lambda ratio: float(ratio.num)/float(ratio.den)
@@ -139,7 +130,9 @@ class DB():
                     password=self.dbpass
                     )
             except psycopg2.OperationalError as e:
+                print('#################')
                 raise DBException("Error connecting to database on '%s'. %s" % (self.dbhost, str(e)))
+                print('#################')
 
     def _close(self):
         """
@@ -174,6 +167,13 @@ class DB():
 
 DB = DB()
 
+######################
+## Rename file locally
+######################
+print('Processing File: %s ' % (file_basename))
+print('Renaming to: %s ' % (output_jpg))
+os.rename(input_filename, path_to_output_jpg)
+
 with open(path_to_output_jpg, 'rb') as f:
     try:
         ###############
@@ -197,14 +197,10 @@ with open(path_to_output_jpg, 'rb') as f:
         ##############################
         path = SPACESPATH
         full_path = path + output_jpg
-
         sql = 'INSERT into ' + SCHEMA + '.' + TABLE + ' (name, path, full_path, latitude, longitude, current_image_date) values(%s, %s, %s, %s, %s, %s);'
-
         data = (output_jpg, path, full_path, latitude, longitude, current_image_date)
         DB.insert_data(sql, data)
-
         print('Creating point at: Latitude: %s, Longitude: %s ' % (latitude, longitude))
-        print('###################')
 
         try:
             ######################################
@@ -228,26 +224,25 @@ with open(path_to_output_jpg, 'rb') as f:
             # make file public after upload
             client.put_object_acl( ACL='public-read', Bucket=BUCKETNAME, Key=key_text)
 
-            print('##################')
-            print('%s uploading complete. ' % (output_jpg))
-            print('#################')
+            print('%s uploading complete. \n' % (output_jpg))
 
         except Exception as e:
-            print('Error: Could not upload file...')
             print('#################')
+            print('Error: Could not upload file...')
             # If upload to Spaces did not complete then remove point from database
             print('Removing point from table..')
             sql_remove = 'DELETE from ' + SCHEMA + '.' + TABLE + ' WHERE name = %s;'
             data_remove = [output_jpg]
             DB.delete_data(sql_remove, data_remove)
             print(sql_remove % (output_jpg))
-            print('#################')
             print(e)
             raise
+            print('#################')
 
     except Exception as e:
         print('Error: Could not insert data.')
         print(e)
+        print('#################')
 
     finally:
         f.close()
