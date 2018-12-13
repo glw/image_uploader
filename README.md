@@ -10,7 +10,7 @@ mkvirtualenv image_upload
 3. Install required python libraries
 ```
 cd image_uploader
-pip install requirements.txt
+pip install -r requirements.txt
 ```
 4. Run
 ```
