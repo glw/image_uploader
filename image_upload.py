@@ -34,6 +34,7 @@ import piexif
 config = yaml.safe_load(open("config.yaml"))
 # postgresql db
 HOST = config['postgresql']['HOST']
+PORT = config['postgresql']['PORT']
 USER = config['postgresql']['USER']
 PASSWD = config['postgresql']['PASSWD']
 DATABASE = config['postgresql']['DATABASE']
@@ -62,14 +63,15 @@ file_path, file_basename = os.path.split(input_filename)
 output_jpg = uuid.uuid4().hex + '.jpg'
 path_to_output_jpg = os.path.join(file_path,output_jpg)
 
+
 # Image Shrinking
 def resize_image(image):
     file, ext = os.path.splitext(image)
     im = Image.open(image)
     exif_dict = piexif.load(im.info["exif"])
     exif_bytes = piexif.dump(exif_dict)
-    im.thumbnail((800, 800))
-    im.save(file+'.jpg' , 'jpeg', quality=80, optimize=True, progressive=True, exif=exif_bytes)
+    im.resize((round(im.size[0]*0.5), round(im.size[1]*0.5)))
+    im.save(file + '.jpg' , 'jpeg', quality=40, optimize=True, progressive=True, exif=exif_bytes)
 
 # source: https://github.com/ianare/exif-py/issues/66
 def get_coordinates(tags):
@@ -112,6 +114,7 @@ class DB():
     def __init__(self):
         self.conn = None
         self.dbhost = HOST
+        self.dbport = PORT
         self.dbname = DATABASE
         self.dbuser = USER
         self.dbpass = PASSWD
@@ -125,6 +128,7 @@ class DB():
             try:
                 self.conn = psycopg2.connect(
                     host=self.dbhost,
+                    port = self.dbport,
                     database=self.dbname,
                     user=self.dbuser,
                     password=self.dbpass
@@ -174,6 +178,9 @@ print('Processing File: %s ' % (file_basename))
 print('Renaming to: %s ' % (output_jpg))
 os.rename(input_filename, path_to_output_jpg)
 
+# Final DO Spaces location
+key_text = os.path.join(SPACESDIR, output_jpg)
+
 with open(path_to_output_jpg, 'rb') as f:
     try:
         ###############
@@ -196,11 +203,12 @@ with open(path_to_output_jpg, 'rb') as f:
         ## Upload metadata to postgis
         ##############################
         path = SPACESPATH
-        full_path = path + output_jpg
-        sql = 'INSERT into ' + SCHEMA + '.' + TABLE + ' (name, path, full_path, latitude, longitude, current_image_date) values(%s, %s, %s, %s, %s, %s);'
+        full_path = os.path.join(SPACESPATH, key_text)
+        sql = 'INSERT into ' + SCHEMA + '.' + TABLE + '(name, path, full_path, latitude, longitude, current_image_date) values(%s, %s, %s, %s, %s, %s);'
         data = (output_jpg, path, full_path, latitude, longitude, current_image_date)
         DB.insert_data(sql, data)
         print('Creating point at: Latitude: %s, Longitude: %s ' % (latitude, longitude))
+
 
         try:
             ######################################
@@ -215,12 +223,11 @@ with open(path_to_output_jpg, 'rb') as f:
                                     aws_access_key_id=ACCESS_KEY_ID,
                                     aws_secret_access_key=SECRET_ACCESS_KEY)
 
-            key_text = os.path.join(SPACESDIR, output_jpg)
-
             # upload file
-            client.upload_file(path_to_output_jpg,  # Path to local file
-                                BUCKETNAME,  # Name of Space
-                                os.path.join('objects', output_jpg))  # Name for remote file
+            client.upload_file(path_to_output_jpg, # Path to local file
+                               BUCKETNAME,         # Name of Space
+                               key_text)           # Name for remote file
+            
             # make file public after upload
             client.put_object_acl( ACL='public-read', Bucket=BUCKETNAME, Key=key_text)
 

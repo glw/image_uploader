@@ -5,6 +5,7 @@ postgresql:
     DATABASE: 'database'
     SCHEMA: 'schema'
     TABLE: 'table'
+    PORT: 'port'
 
 spaces:
     REGION_NAME: 'nyc3'
