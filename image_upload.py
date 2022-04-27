@@ -19,19 +19,19 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 import os
 import yaml
-import boto3
-import uuid
+# import boto3
+# import uuid
 import argparse
 import exifread
 import psycopg2
 import psycopg2.extras
 from datetime import date
-from PIL import Image
-import piexif
+# from PIL import Image
+# import piexif
 
 
 # Config setup
-config = yaml.safe_load(open("config.yaml"))
+config = yaml.safe_load(open("./image_uploader/config.yaml"))
 # postgresql db
 HOST = config['postgresql']['HOST']
 PORT = config['postgresql']['PORT']
@@ -60,18 +60,20 @@ input_filename = args["input"]
 file_path, file_basename = os.path.split(input_filename)
 
 # Create new_name
-output_jpg = uuid.uuid4().hex + '.jpg'
-path_to_output_jpg = os.path.join(file_path,output_jpg)
+# output_jpg = uuid.uuid4().hex + '.jpg'
+# path_to_output_jpg = os.path.join(file_path,output_jpg)
+output_jpg = file_basename
+path_to_output_jpg = input_filename
 
 
-# Image Shrinking
-def resize_image(image):
-    file, ext = os.path.splitext(image)
-    im = Image.open(image)
-    exif_dict = piexif.load(im.info["exif"])
-    exif_bytes = piexif.dump(exif_dict)
-    im.resize((round(im.size[0]*0.5), round(im.size[1]*0.5)))
-    im.save(file + '.jpg' , 'jpeg', quality=40, optimize=True, progressive=True, exif=exif_bytes)
+# # Image Shrinking
+# def resize_image(image):
+#     file, ext = os.path.splitext(image)
+#     im = Image.open(image)
+#     exif_dict = piexif.load(im.info["exif"])
+#     exif_bytes = piexif.dump(exif_dict)
+#     im.resize((round(im.size[0]*0.5), round(im.size[1]*0.5)))
+#     im.save(file + '.jpg' , 'jpeg', quality=40, optimize=True, progressive=True, exif=exif_bytes)
 
 # source: https://github.com/ianare/exif-py/issues/66
 def get_coordinates(tags):
@@ -175,8 +177,8 @@ DB = DB()
 ## Rename file locally
 ######################
 print('Processing File: %s ' % (file_basename))
-print('Renaming to: %s ' % (output_jpg))
-os.rename(input_filename, path_to_output_jpg)
+# print('Renaming to: %s ' % (output_jpg))
+# os.rename(input_filename, path_to_output_jpg)
 
 # Final DO Spaces location
 key_text = os.path.join(SPACESDIR, output_jpg)
@@ -196,8 +198,8 @@ with open(path_to_output_jpg, 'rb') as f:
         #################################
         ## Shrink image keeping exif tags
         #################################
-        print('Shrinking image...')
-        resize_image(path_to_output_jpg)
+        # print('Shrinking image...')
+        # resize_image(path_to_output_jpg)
 
         ##############################
         ## Upload metadata to postgis
@@ -210,41 +212,41 @@ with open(path_to_output_jpg, 'rb') as f:
         print('Creating point at: Latitude: %s, Longitude: %s ' % (latitude, longitude))
 
 
-        try:
-            ######################################
-            print('Upload file to Digital Ocean Spaces')
-            ######################################
+        # try:
+        #     ######################################
+        #     # print('Upload file to Digital Ocean Spaces')
+        #     ######################################
 
-            # https://medium.com/@tatianatylosky/uploading-files-with-python-using-digital-ocean-spaces-58c9a57eb05b
-            session = boto3.session.Session()
-            client = session.client('s3',
-                                    region_name=REGION_NAME,
-                                    endpoint_url=ENDPOINT_URL,
-                                    aws_access_key_id=ACCESS_KEY_ID,
-                                    aws_secret_access_key=SECRET_ACCESS_KEY)
+        #     # https://medium.com/@tatianatylosky/uploading-files-with-python-using-digital-ocean-spaces-58c9a57eb05b
+        #     session = boto3.session.Session()
+        #     client = session.client('s3',
+        #                             region_name=REGION_NAME,
+        #                             endpoint_url=ENDPOINT_URL,
+        #                             aws_access_key_id=ACCESS_KEY_ID,
+        #                             aws_secret_access_key=SECRET_ACCESS_KEY)
 
-            # upload file
-            client.upload_file(path_to_output_jpg, # Path to local file
-                               BUCKETNAME,         # Name of Space
-                               key_text)           # Name for remote file
+        #     # upload file
+        #     client.upload_file(path_to_output_jpg, # Path to local file
+        #                        BUCKETNAME,         # Name of Space
+        #                        key_text)           # Name for remote file
             
-            # make file public after upload
-            client.put_object_acl( ACL='public-read', Bucket=BUCKETNAME, Key=key_text)
+        #     # make file public after upload
+        #     client.put_object_acl( ACL='public-read', Bucket=BUCKETNAME, Key=key_text)
 
-            print('%s uploading complete. \n' % (output_jpg))
+        #     print('%s uploading complete. \n' % (output_jpg))
 
-        except Exception as e:
-            print('#################')
-            print('Error: Could not upload file...')
-            # If upload to Spaces did not complete then remove point from database
-            print('Removing point from table..')
-            sql_remove = 'DELETE from ' + SCHEMA + '.' + TABLE + ' WHERE name = %s;'
-            data_remove = [output_jpg]
-            DB.delete_data(sql_remove, data_remove)
-            print(sql_remove % (output_jpg))
-            print(e)
-            raise
-            print('#################')
+        # except Exception as e:
+        #     print('#################')
+        #     print('Error: Could not upload file...')
+        #     # If upload to Spaces did not complete then remove point from database
+        #     print('Removing point from table..')
+        #     sql_remove = 'DELETE from ' + SCHEMA + '.' + TABLE + ' WHERE name = %s;'
+        #     data_remove = [output_jpg]
+        #     DB.delete_data(sql_remove, data_remove)
+        #     print(sql_remove % (output_jpg))
+        #     print(e)
+        #     raise
+        #     print('#################')
 
     except Exception as e:
         print('Error: Could not insert data.')
